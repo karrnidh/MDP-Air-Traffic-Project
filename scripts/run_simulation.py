@@ -1,71 +1,55 @@
-from simulation_model import AirTrafficModel
-import matplotlib.pyplot as plt
+import time
 import pandas as pd
-import numpy as np
+from simulation_model import AirTrafficModel
 
-# initialize model
+# =========================
+# INITIALIZE MODEL
+# =========================
 model = AirTrafficModel()
+steps = 500
 
 print("\nStarting simulation...\n")
 
-step = 0
+# =========================
+# RUN SIMULATION
+# =========================
+start_time = time.time()
 
-# run until all aircraft finish
-while any(agent.step_index < len(agent.trajectory) for agent in model.schedule.agents):
-    
-    print(f"\n--- Simulation Step {step} ---")
+for step in range(steps):
     model.step()
-    step += 1
 
-print("\nSimulation complete!\n")
+end_time = time.time()
 
 # =========================
-# SAVE RESULTS TO CSV
+# SUMMARY METRICS
 # =========================
-results = []
+total_aircraft = len(model.schedule.agents)
+total_separation = sum(model.separation_violations.values())
+total_tfr = sum(agent.violation_count for agent in model.schedule.agents)
+runtime = round(end_time - start_time, 2)
+
+print("\n===== FINAL SUMMARY =====")
+print(f"Total Aircraft: {total_aircraft}")
+print(f"Total Separation Events: {total_separation}")
+print(f"Total TFR Violations: {total_tfr}")
+print(f"Runtime: {runtime} seconds")
+
+# =========================
+# TABLE FORMAT OUTPUT
+# =========================
+data = []
 
 for agent in model.schedule.agents:
-    results.append({
+    data.append({
         "Callsign": agent.callsign,
-        "Total Steps": len(agent.history),
+        "Separation Violations": model.separation_violations.get(agent.callsign, 0),
         "TFR Violations": agent.violation_count
     })
 
-df = pd.DataFrame(results)
+df = pd.DataFrame(data)
 
-df.to_csv("simulation_results.csv", index=False)
+# sort for cleaner view
+df = df.sort_values(by="Separation Violations", ascending=False)
 
-print("Results saved to simulation_results.csv")
-print(df)
-
-# =========================
-# PLOT TRAJECTORIES
-# =========================
-plt.figure(figsize=(10, 7))
-
-for agent in model.schedule.agents:
-    lats = [pos[0] for pos in agent.history]
-    lons = [pos[1] for pos in agent.history]
-
-    plt.plot(lons, lats, label=agent.callsign)
-
-# TFR circle
-tfr_lat = 25.997
-tfr_lon = -97.156
-radius_km = 30
-radius_deg = radius_km / 111
-
-theta = np.linspace(0, 2 * np.pi, 100)
-
-circle_lat = tfr_lat + radius_deg * np.sin(theta)
-circle_lon = tfr_lon + radius_deg * np.cos(theta)
-
-plt.plot(circle_lon, circle_lat, linestyle='--', label='TFR Zone')
-
-plt.xlabel("Longitude")
-plt.ylabel("Latitude")
-plt.title("Simulated Aircraft Trajectories")
-plt.legend()
-plt.grid(True)
-
-plt.show()
+print("\n===== PER AIRCRAFT TABLE =====")
+print(df.to_string(index=False))

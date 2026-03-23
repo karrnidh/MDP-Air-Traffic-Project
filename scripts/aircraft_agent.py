@@ -15,9 +15,17 @@ class AircraftAgent(Agent):
 
         self.history = []
 
-        # metrics
+        # =========================
+        # METRICS
+        # =========================
         self.violation_count = 0
-        self.violation_points = []   # ✅ NEW
+        self.violation_points = []
+
+        # =========================
+        # TFR TRACKING
+        # =========================
+        self.in_tfr = False          # track if currently inside
+        self.tfr_cooldown = 0        # prevent rapid re-counting
 
     def step(self):
 
@@ -34,16 +42,30 @@ class AircraftAgent(Agent):
 
         print(f"{self.callsign} position: {self.latitude:.4f}, {self.longitude:.4f}")
 
-        # TFR violation check
-        if self.model.tfr.contains(self.latitude, self.longitude):
-            print(f"⚠ WARNING: {self.callsign} entered TFR!")
+        # =========================
+        # TFR VIOLATION CHECK (FINAL FIX)
+        # =========================
+        inside_tfr = self.model.tfr.contains(self.latitude, self.longitude)
+
+        # reduce cooldown each step
+        if self.tfr_cooldown > 0:
+            self.tfr_cooldown -= 1
+
+        # count only valid entry (with cooldown protection)
+        if inside_tfr and not self.in_tfr and self.tfr_cooldown == 0:
+            print(f"⚠ WARNING: {self.callsign} ENTERED TFR!")
             self.violation_count += 1
 
-            # store violation point for visualization
             self.violation_points.append((
                 self.longitude,
                 self.latitude,
                 self.altitude
             ))
+
+            # prevent jitter-based multiple counts
+            self.tfr_cooldown = 20
+
+        # update state
+        self.in_tfr = inside_tfr
 
         self.step_index += 1
