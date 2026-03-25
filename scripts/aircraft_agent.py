@@ -1,4 +1,6 @@
 from mesa import Agent
+import math
+
 
 class AircraftAgent(Agent):
 
@@ -15,17 +17,19 @@ class AircraftAgent(Agent):
 
         self.history = []
 
-        # =========================
+        #
         # METRICS
-        # =========================
+        #
         self.violation_count = 0
         self.violation_points = []
+        self.avoidance_count = 0
+        self.total_distance = 0   
 
-        # =========================
+        #
         # TFR TRACKING
-        # =========================
-        self.in_tfr = False          # track if currently inside
-        self.tfr_cooldown = 0        # prevent rapid re-counting
+        #
+        self.in_tfr = False
+        self.tfr_cooldown = 20
 
     def step(self):
 
@@ -34,24 +38,56 @@ class AircraftAgent(Agent):
 
         row = self.trajectory.iloc[self.step_index]
 
-        self.latitude = row["latitude"]
-        self.longitude = row["longitude"]
-        self.altitude = row["Altitude"]
+        new_lat = row["latitude"]
+        new_lon = row["longitude"]
+        new_alt = row["Altitude"]
 
+        #
+        # DISTANCE CALCULATION (NEW)
+        #
+        if self.latitude is not None:
+            dlat = new_lat - self.latitude
+            dlon = new_lon - self.longitude
+            step_distance = math.sqrt(dlat**2 + dlon**2) * 111
+            self.total_distance += step_distance
+
+        # update position
+        self.latitude = new_lat
+        self.longitude = new_lon
+        self.altitude = new_alt
+
+        #
+        # LOOK-AHEAD TFR AVOIDANCE (WEEK 4)
+        #
+        if self.step_index + 1 < len(self.trajectory):
+            next_row = self.trajectory.iloc[self.step_index + 1]
+            next_lat = next_row["latitude"]
+            next_lon = next_row["longitude"]
+
+            if self.model.tfr.contains(next_lat, next_lon):
+                print(f"🚫 {self.callsign} avoiding TFR")
+
+                # simple deviation
+                self.latitude += 0.1
+                self.longitude += 0.1
+
+                self.avoidance_count += 1
+
+        # store trajectory
         self.history.append((self.latitude, self.longitude))
 
         print(f"{self.callsign} position: {self.latitude:.4f}, {self.longitude:.4f}")
 
-        # =========================
-        # TFR VIOLATION CHECK (FINAL FIX)
-        # =========================
+        #
+        # TFR VIOLATION CHECK
+        #
         inside_tfr = self.model.tfr.contains(self.latitude, self.longitude)
 
-        # reduce cooldown each step
+        # cooldown update
         if self.tfr_cooldown > 0:
             self.tfr_cooldown -= 1
 
-        # count only valid entry (with cooldown protection)
+        # entry-based detection
         if inside_tfr and not self.in_tfr and self.tfr_cooldown == 0:
             print(f"⚠ WARNING: {self.callsign} ENTERED TFR!")
             self.violation_count += 1
@@ -62,10 +98,8 @@ class AircraftAgent(Agent):
                 self.altitude
             ))
 
-            # prevent jitter-based multiple counts
             self.tfr_cooldown = 20
 
-        # update state
         self.in_tfr = inside_tfr
 
         self.step_index += 1

@@ -2,17 +2,17 @@ import time
 import pandas as pd
 from simulation_model import AirTrafficModel
 
-# =========================
+#
 # INITIALIZE MODEL
-# =========================
+
 model = AirTrafficModel()
 steps = 500
 
 print("\nStarting simulation...\n")
 
-# =========================
+#
 # RUN SIMULATION
-# =========================
+#
 start_time = time.time()
 
 for step in range(steps):
@@ -20,9 +20,9 @@ for step in range(steps):
 
 end_time = time.time()
 
-# =========================
+#
 # SUMMARY METRICS
-# =========================
+#
 total_aircraft = len(model.schedule.agents)
 total_separation = sum(model.separation_violations.values())
 total_tfr = sum(agent.violation_count for agent in model.schedule.agents)
@@ -34,9 +34,9 @@ print(f"Total Separation Events: {total_separation}")
 print(f"Total TFR Violations: {total_tfr}")
 print(f"Runtime: {runtime} seconds")
 
-# =========================
+#
 # TABLE FORMAT OUTPUT
-# =========================
+#
 data = []
 
 for agent in model.schedule.agents:
